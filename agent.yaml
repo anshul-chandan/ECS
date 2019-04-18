@@ -39,6 +39,9 @@ monitors:
   # - type: collectd/memory
   # - type: collectd/protocols
   - type: collectd/signalfx-metadata
+    extraDimensions:
+      source: gateway
+      ClusterName: ${ECS_CLUSTER}
   # - type: host-metadata
     # etcPath: /hostfs/etc
   # - type: collectd/uptime
