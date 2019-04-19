@@ -1,22 +1,18 @@
-# This agent config file is designed for use within an ECS cluster.  The agent
-# should be run as a Daemon service with the host EC2 instance's filesystem
-# mounted in at /hostfs and the docker socket mounted in at
-# /var/run/docker.sock.
-signalFxAccessToken: {"#from": "env:ACCESS_TOKEN"}
-ingestUrl: {"#from": "env:INGEST_URL", optional: true}
-apiUrl: {"#from": "env:API_URL", optional: true}
+#hostname: ${SFX_SERVER_NAME}
+signalFxAccessToken: ${SFX_ACCESS_TOKEN}
 
-intervalSeconds: {"#from": "env:INTERVAL_SECONDS", default: 30}
+etcPath: /hostfs/etc
+procPath: /hostfs/proc
+runPath: /hostfs/run
+varPath: /hostfs/var
+sysPath: /hostfs/sys
 
-logging:
-  level: {"#from": "env:LOG_LEVEL", default: "info"}
-
-# observers are what discover running services in the environment
+globalDimensions:
+  - cluster: ${SFX_GATEWAY_CLUSTERNAME}
 observers:
-    # Enable the docker observer to discover other ECS tasks running on the
-    # same EC2 instance.
+  - type: host
   - type: docker
-    # ECS tasks running the awsvpc network mode don't actually expose and IP
+    # ECS tasks running the 'awsvpc' network mode don't actually expose an IP
     # address on the docker inspect API so we need to use the hostname instead.
     useHostnameIfPresent: true
     labelsToDimensions: &labelMap
@@ -26,50 +22,25 @@ observers:
       com.amazonaws.ecs.container-name: container_spec_name
       com.amazonaws.ecs.task-arn: ecs_task_arn
       com.amazonaws.ecs.task-definition-family: ecs_task_group
-      com.amazonaws.ecs.task-definition-version: ecs_task_version
-
+      com.amazonaws.ecs.task-definition-version: ecs_task_version    
 monitors:
+  - type: host-metadata
   - type: collectd/cpu
-  # - type: collectd/cpufreq
+  - type: collectd/cpufreq
   - type: collectd/df
-    hostFSPath: /hostfs
   - type: collectd/disk
-  # - type: collectd/interface
-  # - type: collectd/load
-  # - type: collectd/memory
-  # - type: collectd/protocols
+  - type: collectd/interface
+  - type: collectd/load
+  - type: collectd/memory
+  - type: collectd/vmem
   - type: collectd/signalfx-metadata
     extraDimensions:
       source: gateway
-      ClusterName: ${ECS_CLUSTER}
-  # - type: host-metadata
-    # etcPath: /hostfs/etc
-  # - type: collectd/uptime
-  # - type: collectd/vmem
-  - type: collectd/genericjmx
-
+      ClusterName: ${SFX_GATEWAY_CLUSTERNAME}
   - type: docker-container-stats
     labelsToDimensions:
       <<: *labelMap
 
-    # You can set this envvar in your task definition to provide extra monitor
-    # configuration to monitor applications running as ECS tasks.  You should
-    # probably use discovery rules so that you don't have to have a specific
-    # config for each EC2 instance.
-  - {"#from": "env:EXTRA_MONITOR_CONFIG", default: [], flatten: true}
-
 metricsToExclude:
   - {"#from": "/lib/whitelist.json", flatten: true}
   - {"#from": "env:METRICS_TO_EXCLUDE", default: [], flatten: true}
-  - metricNames:
-    - disk_merged.read
-    - disk_merged.write
-    - disk_octets.read
-    - disk_octets.write
-    - disk_time.read
-    - disk_time.write
-
-
-# This allows any config above to be completely overridden.  CONFIG_OVERRIDE
-# must be given as a YAML/JSON object.
-_: {"#from": "env:CONFIG_OVERRIDE", optional: true, flatten: true}
